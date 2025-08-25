@@ -1,12 +1,10 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
 import { CONFIG } from './config';
 
-neonConfig.webSocketConstructor = ws;
-
-const DATABASE_URL = CONFIG.database.url || process.env.DATABASE_URL;
+// Force use of the custom database URL from config
+const DATABASE_URL = CONFIG.database.url;
 
 if (!DATABASE_URL) {
   throw new Error(
@@ -15,4 +13,4 @@ if (!DATABASE_URL) {
 }
 
 export const pool = new Pool({ connectionString: DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+export const db = drizzle(pool, { schema });

@@ -26,9 +26,16 @@ export const CONFIG = {
 
   // Database Configuration
   database: {
-    // You can also set DATABASE_URL environment variable to override
-    // If DATABASE_URL is not set, the app will try to create a database
-    url: process.env.DATABASE_URL || undefined,
+    // ==== CHOOSE YOUR DATABASE OPTION ====
+    // Option 1: Use your external Render PostgreSQL database
+    // Note: If there are network issues, the app will automatically fall back to in-memory storage
+    url: 'postgresql://emergency_response_db_user:FdHkQyHwvmiJL6PP4v4xPVMTLfALSDzp@dpg-d2li6lje5dus738rrhq0-a/emergency_response_db',
+    
+    // Option 2: Use local Replit database (comment out the line above and uncomment below)
+    // url: process.env.DATABASE_URL,
+    
+    // Option 3: Use in-memory storage only (set to null)
+    // url: null,
   },
 
   // Application Configuration
