@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 async function createDefaultOperator() {
   try {
-    // Use centralized config instead of hardcoded values
+ 
     const operatorUsername = process.env.OPERATOR_USERNAME || CONFIG.auth.adminUsername;
     const operatorPassword = process.env.OPERATOR_PASSWORD || CONFIG.auth.adminPassword;
 
