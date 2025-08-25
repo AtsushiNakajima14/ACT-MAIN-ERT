@@ -9,7 +9,8 @@ import PublicInterface from "@/pages/PublicInterface";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
 import { OfflineIndicator } from "@/components/offline-indicator";
-import { useOnlineStatusWithCallback } from "@/hooks/use-online-status";
+import { OfflineQueueStatus } from "@/components/OfflineQueueStatus";
+import { useOnlineStatusWithCallback, useOfflineSubmissionSync } from "@/hooks/use-online-status";
 import { Component, ReactNode, useEffect } from "react";
 
 class ErrorBoundary extends Component<
@@ -58,6 +59,9 @@ function Router() {
   const { isOnline } = useOnlineStatusWithCallback(() => {
     queryClient.invalidateQueries();
   });
+  
+  // Enable offline submission syncing
+  useOfflineSubmissionSync();
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -92,6 +96,7 @@ function Router() {
   return (
     <>
       <OfflineIndicator />
+      <OfflineQueueStatus />
       <Switch>
         <Route path="/" component={PublicInterface} />
         <Route path="/operator">

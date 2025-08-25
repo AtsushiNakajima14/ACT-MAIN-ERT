@@ -43,8 +43,40 @@ export function useOnlineStatusWithCallback(callback?: () => void) {
       if (callback) {
         setTimeout(callback, 1000);
       }
+      
+      // Trigger background sync when coming back online
+      if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready.then(registration => {
+          if ('sync' in registration) {
+            console.log('📶 Back online - registering sync for offline submissions');
+            (registration as any).sync.register('sync-all-offline').catch((error: any) => {
+              console.error('Failed to register background sync:', error);
+            });
+          }
+        });
+      }
     }
   }, [isOnline, wasOffline, callback]);
 
   return { isOnline, wasOffline };
+}
+
+// Hook specifically for handling offline submissions sync
+export function useOfflineSubmissionSync() {
+  const { isOnline } = useOnlineStatusWithCallback();
+  
+  useEffect(() => {
+    if (isOnline && 'serviceWorker' in navigator) {
+      // Check if we have any queued submissions and sync them
+      navigator.serviceWorker.ready.then(registration => {
+        if ('sync' in registration) {
+          (registration as any).sync.register('offline-submissions').catch((error: any) => {
+            console.error('Failed to sync offline submissions:', error);
+          });
+        }
+      });
+    }
+  }, [isOnline]);
+  
+  return { isOnline };
 }

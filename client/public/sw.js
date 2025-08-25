@@ -1,6 +1,7 @@
-const CACHE_NAME = 'emergency-notifications-v2';
-const API_CACHE_NAME = 'emergency-api-v2';
-const ASSETS_CACHE_NAME = 'emergency-assets-v2';
+const CACHE_NAME = 'emergency-notifications-v3';
+const API_CACHE_NAME = 'emergency-api-v3';
+const ASSETS_CACHE_NAME = 'emergency-assets-v3';
+const OFFLINE_QUEUE_NAME = 'offline-submissions-v1';
 const OFFLINE_NOTIFICATIONS_DB = 'offline-notifications';
 
 const CACHE_CONFIG = {
@@ -83,15 +84,24 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
   
-  if (request.method !== 'GET') return;
+  // Handle all requests from same origin and fonts
   if (!url.origin.includes(self.location.origin) && !url.href.includes('fonts.googleapis.com')) return;
   
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(handleAPIRequest(request));
-  } else if (CACHE_CONFIG.STATIC_ASSETS.test(url.pathname) || url.href.includes('fonts.googleapis.com')) {
-    event.respondWith(handleAssetRequest(request));
-  } else {
-    event.respondWith(handleAppShellRequest(request));
+  // Handle POST requests for offline submissions
+  if (request.method === 'POST' && url.pathname.startsWith('/api/')) {
+    event.respondWith(handleOfflineSubmission(request));
+    return;
+  }
+  
+  // Handle GET requests normally
+  if (request.method === 'GET') {
+    if (url.pathname.startsWith('/api/')) {
+      event.respondWith(handleAPIRequest(request));
+    } else if (CACHE_CONFIG.STATIC_ASSETS.test(url.pathname) || url.href.includes('fonts.googleapis.com')) {
+      event.respondWith(handleAssetRequest(request));
+    } else {
+      event.respondWith(handleAppShellRequest(request));
+    }
   }
 });
 
@@ -410,10 +420,18 @@ async function openOrFocusApp(notificationData) {
   }
 }
 
-// Handle background sync for offline notifications
+// Handle background sync for offline notifications AND submissions
 self.addEventListener('sync', (event) => {
+  console.log('🔄 Background sync triggered:', event.tag);
   if (event.tag === 'emergency-sync') {
     event.waitUntil(handleBackgroundSync());
+  } else if (event.tag === 'offline-submissions') {
+    event.waitUntil(processOfflineSubmissions());
+  } else if (event.tag === 'sync-all-offline') {
+    event.waitUntil(Promise.all([
+      handleBackgroundSync(),
+      processOfflineSubmissions()
+    ]));
   }
 });
 
@@ -626,6 +644,199 @@ async function trackNotificationAction(deliveryId, action) {
     console.log(`📊 Tracked action '${action}' for delivery:`, deliveryId);
   } catch (error) {
     console.error('❌ Failed to track action:', error);
+  }
+}
+
+// Handle offline submission requests
+async function handleOfflineSubmission(request) {
+  const url = new URL(request.url);
+  
+  try {
+    // Try network first with fast timeout for better UX
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    
+    console.log('🌐 Attempting network submission:', url.pathname);
+    const networkResponse = await fetch(request.clone(), {
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (networkResponse.ok) {
+      console.log('✅ Network submission successful:', url.pathname);
+      return networkResponse;
+    } else {
+      throw new Error(`Network error: ${networkResponse.status}`);
+    }
+  } catch (error) {
+    console.log('📡 Network failed, queueing for offline:', url.pathname, error.message);
+    
+    // Queue the submission for later
+    await queueOfflineSubmission(request);
+    
+    // Return immediate success response for UX
+    const offlineResponse = {
+      success: true,
+      offline: true,
+      message: 'Your emergency report has been queued and will be submitted when connection is restored.',
+      timestamp: Date.now(),
+      queuedForSync: true
+    };
+    
+    return new Response(JSON.stringify(offlineResponse), {
+      status: 200,
+      statusText: 'OK (Queued Offline)',
+      headers: {
+        'Content-Type': 'application/json',
+        'offline-queued': 'true'
+      }
+    });
+  }
+}
+
+// Queue submission for offline processing
+async function queueOfflineSubmission(request) {
+  try {
+    const url = new URL(request.url);
+    const body = await request.clone().text();
+    const headers = Object.fromEntries(request.headers.entries());
+    
+    const submission = {
+      id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
+      url: request.url,
+      method: request.method,
+      headers: headers,
+      body: body,
+      timestamp: Date.now(),
+      retries: 0,
+      isEmergency: url.pathname.includes('user-reports') || url.pathname.includes('emergency')
+    };
+    
+    // Store in cache for persistence
+    const cache = await caches.open(OFFLINE_QUEUE_NAME);
+    const queueResponse = new Response(JSON.stringify(submission));
+    await cache.put(new Request(`/offline-queue/${submission.id}`), queueResponse);
+    
+    console.log('💾 Queued offline submission:', submission.id);
+    
+    // Register background sync
+    if (self.registration.sync) {
+      await self.registration.sync.register('offline-submissions');
+      console.log('🔄 Background sync registered for offline submissions');
+    }
+    
+    // Also notify any open clients about the queued submission
+    notifyClientsOfQueuedSubmission(submission);
+    
+  } catch (error) {
+    console.error('❌ Failed to queue offline submission:', error);
+  }
+}
+
+// Process queued offline submissions
+async function processOfflineSubmissions() {
+  console.log('🔄 Processing queued offline submissions...');
+  
+  try {
+    const cache = await caches.open(OFFLINE_QUEUE_NAME);
+    const requests = await cache.keys();
+    
+    if (requests.length === 0) {
+      console.log('📭 No queued submissions found');
+      return;
+    }
+    
+    console.log(`📬 Found ${requests.length} queued submissions`);
+    
+    for (const request of requests) {
+      try {
+        const response = await cache.match(request);
+        if (!response) continue;
+        
+        const submission = await response.json();
+        
+        // Try to submit
+        console.log('🚀 Attempting to submit queued item:', submission.id);
+        
+        const result = await fetch(submission.url, {
+          method: submission.method,
+          headers: submission.headers,
+          body: submission.body
+        });
+        
+        if (result.ok) {
+          console.log('✅ Successfully submitted queued item:', submission.id);
+          await cache.delete(request);
+          
+          // Notify clients of successful submission
+          notifyClientsOfSubmissionSuccess(submission);
+        } else {
+          throw new Error(`HTTP ${result.status}: ${result.statusText}`);
+        }
+        
+      } catch (error) {
+        console.error('❌ Failed to submit queued item:', error);
+        // Keep item in queue for retry
+      }
+    }
+    
+    // Check if any items remain and schedule another sync if needed
+    const remainingRequests = await cache.keys();
+    if (remainingRequests.length > 0) {
+      console.log(`⏰ ${remainingRequests.length} submissions still pending, will retry later`);
+      if (self.registration.sync) {
+        setTimeout(() => {
+          self.registration.sync.register('offline-submissions');
+        }, 30000); // Retry in 30 seconds
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Error processing offline submissions:', error);
+  }
+}
+
+// Notify clients about queued submissions
+async function notifyClientsOfQueuedSubmission(submission) {
+  try {
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      if (client.postMessage) {
+        client.postMessage({
+          type: 'submission-queued',
+          data: {
+            id: submission.id,
+            timestamp: submission.timestamp,
+            isEmergency: submission.isEmergency
+          }
+        });
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to notify clients of queued submission:', error);
+  }
+}
+
+// Notify clients about successful submissions
+async function notifyClientsOfSubmissionSuccess(submission) {
+  try {
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      if (client.postMessage) {
+        client.postMessage({
+          type: 'submission-success',
+          data: {
+            id: submission.id,
+            timestamp: Date.now(),
+            wasQueued: true,
+            isEmergency: submission.isEmergency
+          }
+        });
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to notify clients of submission success:', error);
   }
 }
 

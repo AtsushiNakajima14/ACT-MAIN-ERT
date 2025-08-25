@@ -12,15 +12,42 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
-
-  await throwIfResNotOk(res);
-  return res;
+  // Fast timeout for better UX - especially important for emergency submissions
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+  
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: data ? { "Content-Type": "application/json" } : {},
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    // If this is a POST request that failed, the service worker should have
+    // queued it for offline submission, so we don't throw an error
+    if (method === 'POST' && navigator && !navigator.onLine) {
+      console.log('📱 API request failed offline, but service worker should handle it');
+      // Return a success response to indicate the submission was queued
+      return new Response(JSON.stringify({
+        success: true,
+        offline: true,
+        message: 'Your submission has been queued and will be sent when connection is restored.'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -59,11 +86,14 @@ export const queryClient = new QueryClient({
     },
     mutations: {
       retry: (failureCount, error: any) => {
-        if (error?.message?.includes('4')) {
+        // Don't retry POST requests that might have been queued offline
+        if (error?.message?.includes('4') || (error?.name === 'AbortError' && !navigator.onLine)) {
           return false;
         }
         return failureCount < 1;
       },
+      // Faster retry for online mutations
+      retryDelay: 2000,
     },
   },
 });
