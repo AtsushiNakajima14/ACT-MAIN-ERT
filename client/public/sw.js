@@ -807,16 +807,45 @@ async function queueOfflineSubmission(request) {
     const queueResponse = new Response(JSON.stringify(submission));
     await cache.put(new Request(`/offline-queue/${submission.id}`), queueResponse);
     
+    // Also store in IndexedDB via offlineStorage for better operator visibility
+    try {
+      // Notify clients to queue in IndexedDB for better operator visibility
+      const clients = await self.clients.matchAll();
+      clients.forEach(client => {
+        if (client.postMessage) {
+          client.postMessage({ 
+            type: 'queue-in-indexeddb', 
+            submission: submission 
+          });
+        }
+      });
+    } catch (idbError) {
+      console.warn('⚠️ Could not notify clients for IndexedDB queuing:', idbError);
+    }
+    
     console.log('💾 Queued offline submission:', submission.id);
+    
+    // Notify all clients about the queued submission
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      if (client.postMessage) {
+        client.postMessage({
+          type: 'submission-queued',
+          data: {
+            id: submission.id,
+            url: submission.url,
+            timestamp: submission.timestamp,
+            isEmergency: submission.isEmergency
+          }
+        });
+      }
+    });
     
     // Register background sync
     if (self.registration.sync) {
       await self.registration.sync.register('offline-submissions');
       console.log('🔄 Background sync registered for offline submissions');
     }
-    
-    // Also notify any open clients about the queued submission
-    notifyClientsOfQueuedSubmission(submission);
     
   } catch (error) {
     console.error('❌ Failed to queue offline submission:', error);

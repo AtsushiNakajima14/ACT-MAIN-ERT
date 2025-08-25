@@ -40,6 +40,13 @@ export default function IncidentReportForm({ isOpen, onClose }: IncidentReportFo
           description: "You're offline, but your emergency report has been queued and will be submitted when connection is restored.",
           variant: "default",
         });
+      } else if (event.data?.type === 'queue-in-indexeddb') {
+        // Handle IndexedDB queuing for better operator visibility
+        import('@/lib/offlineStorage').then(({ offlineStorage }) => {
+          offlineStorage.queueOfflineSubmission(event.data.submission).catch(error => {
+            console.error('Failed to queue in IndexedDB:', error);
+          });
+        });
       } else if (event.data?.type === 'submission-success' && event.data.data.id === queuedSubmissionId) {
         setIsQueuedOffline(false);
         setQueuedSubmissionId(null);

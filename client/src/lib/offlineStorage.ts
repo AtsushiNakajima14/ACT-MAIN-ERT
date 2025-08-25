@@ -332,6 +332,37 @@ class OfflineStorage {
         retries: 0
       };
       await this.put(STORES.OFFLINE_QUEUE, queueItem);
+      
+      // If this is an emergency report, also store it as a pending report for operators
+      if (submission.isEmergency && submission.body) {
+        try {
+          const reportData = JSON.parse(submission.body);
+          const queuedReport = {
+            id: `queued-${queueItem.id}`,
+            type: reportData.type || 'emergency_report',
+            title: reportData.title || 'Queued Emergency Report',
+            message: reportData.message || reportData.description,
+            location: reportData.location,
+            priority: reportData.priority || 'critical',
+            status: 'queued',
+            createdAt: new Date(queueItem.timestamp).toISOString(),
+            metadata: {
+              ...reportData.metadata,
+              queuedOffline: true,
+              originalSubmissionId: queueItem.id
+            },
+            __offline: true,
+            __queued: true
+          };
+          
+          // Store as a user report that operators can see
+          await this.cacheUserReport(queuedReport);
+          console.log('📱 Cached queued emergency report for operators:', queuedReport.id);
+        } catch (parseError) {
+          console.warn('⚠️ Failed to parse emergency report data for operator display:', parseError);
+        }
+      }
+      
       console.log(`📤 Queued submission ${queueItem.id} for offline sync`);
     } catch (error) {
       console.error('❌ Failed to queue offline submission:', error);
