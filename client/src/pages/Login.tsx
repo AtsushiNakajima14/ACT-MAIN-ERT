@@ -230,7 +230,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="text-center pt-3 sm:pt-4">
               <p className="text-xs text-slate-500 dark:text-slate-400 px-2">
                 Emergency Response Team • Access Portal • {new Date().getFullYear()}
