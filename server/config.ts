@@ -27,9 +27,8 @@ export const CONFIG = {
   // Database Configuration
   database: {
     // ==== CHOOSE YOUR DATABASE OPTION ====
-    // Option 1: Use your external Render PostgreSQL database
-    // Note: If there are network issues, the app will automatically fall back to in-memory storage
-    url: 'postgresql://emergency_response_db_user:FdHkQyHwvmiJL6PP4v4xPVMTLfALSDzp@dpg-d2li6lje5dus738rrhq0-a/emergency_response_db',
+    // Option 1: Use your external Render PostgreSQL database with SSL
+    url: 'postgresql://emergency_response_db_user:FdHkQyHwvmiJL6PP4v4xPVMTLfALSDzp@dpg-d2li6lje5dus738rrhq0-a.oregon-postgres.render.com/emergency_response_db?sslmode=require',
     
     // Option 2: Use local Replit database (comment out the line above and uncomment below)
     // url: process.env.DATABASE_URL,
