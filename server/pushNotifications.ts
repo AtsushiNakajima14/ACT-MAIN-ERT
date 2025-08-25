@@ -1,9 +1,10 @@
 import webpush from 'web-push';
 import { storage } from './storage';
+import { CONFIG } from './config';
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BDhdybofVzDW3l9W1fJhhNQFQiBjc2y7E1l0bAzPDG_TPw0Sw8wTMu_rkdja_pQtLUZJRHT_85m4yIKmJa-w77Y';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 's4a3prczQD75tJR-1PLluXaFFKGNErVfv1KR195sbc8';
-const VAPID_EMAIL = process.env.VAPID_EMAIL || 'mailto:cyyydevv@gmail.com';
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || CONFIG.pushNotifications.vapidPublicKey;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || CONFIG.pushNotifications.vapidPrivateKey;
+const VAPID_EMAIL = process.env.VAPID_EMAIL || CONFIG.pushNotifications.vapidEmail;
 
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_EMAIL) {
   console.error('❌ VAPID configuration incomplete. Push notifications may not work properly.');

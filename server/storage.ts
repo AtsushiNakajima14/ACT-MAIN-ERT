@@ -27,6 +27,7 @@ import {
 import { hashPassword } from "./auth";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
+import { CONFIG } from "./config";
 
 export interface IStorage {
   init(): Promise<void>;
@@ -549,8 +550,8 @@ class DatabaseStorage implements IStorage {
     // Ensure admin credentials exist
     console.log('🔧 Ensuring admin credentials exist in database...');
     
-    const adminUsername = 'operator';
-    const adminPassword = 'ert2025!';
+    const adminUsername = CONFIG.auth.adminUsername;
+    const adminPassword = CONFIG.auth.adminPassword;
     
     const existingAdmin = await this.getUserByUsername(adminUsername);
     

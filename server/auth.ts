@@ -4,6 +4,7 @@ import MemoryStore from 'memorystore';
 import ConnectPgSimple from 'connect-pg-simple';
 import type { Express, RequestHandler } from 'express';
 import { storage } from './storage';
+import { CONFIG } from './config';
 
 declare module 'express-session' {
   interface SessionData {
@@ -40,7 +41,7 @@ export function getSession() {
   }
 
   return session({
-    secret: process.env.SESSION_SECRET || 'emergency-response-offline-key-2024',
+    secret: process.env.SESSION_SECRET || CONFIG.auth.sessionSecret,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,

@@ -2,8 +2,15 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import dotenv from "dotenv";
+import { CONFIG, validateConfig } from "./config";
 
 dotenv.config();
+
+// Validate configuration on startup
+if (!validateConfig()) {
+  console.error('❌ Configuration validation failed. Please check your credentials in server/config.ts');
+  process.exit(1);
+}
 
 const app = express();
 app.use(express.json());
