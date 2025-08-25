@@ -75,6 +75,8 @@ import UserReportsPanel from '@/components/operator/UserReportsPanel';
 import TeamStatusPanel from '@/components/operator/TeamStatusPanel';
 import AddTeamMemberModal from '@/components/operator/AddTeamMemberModal';
 import { NotificationSettings } from '@/components/NotificationSettings';
+import { NetworkStatus, DataFreshnessIndicator } from '@/components/offline-indicator';
+import { useOnlineStatus } from '@/hooks/use-online-status';
 import { Incident, UserReport, TeamMember } from '@shared/schema';
 
 export default function OperatorDashboard() {
@@ -89,6 +91,7 @@ export default function OperatorDashboard() {
   const isMobile = useIsMobile();
   
   const { isSubscribed, isSupported, subscribe, isLoading: pushLoading } = usePushNotifications();
+  const isOnline = useOnlineStatus();
 
   const handleLogout = async () => {
     try {
@@ -371,13 +374,25 @@ export default function OperatorDashboard() {
                 <h1 className="text-white font-bold text-lg tracking-tight" data-testid="header-title">
                   ACT MAIN - ERT
                 </h1>
-                <div className="flex items-center space-x-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'
-                  }`}></div>
-                  <span className="text-white/90 text-xs font-medium">
-                    {isConnected ? 'Live' : reconnectAttempts >= maxReconnectAttempts ? 'Connection Failed' : `Reconnecting (${reconnectAttempts}/${maxReconnectAttempts})`}
-                  </span>
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-2 h-2 rounded-full ${
+                      isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'
+                    }`}></div>
+                    <span className="text-white/90 text-xs font-medium">
+                      {isConnected ? 'Live' : reconnectAttempts >= maxReconnectAttempts ? 'Connection Failed' : `Reconnecting (${reconnectAttempts}/${maxReconnectAttempts})`}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-2 h-2 rounded-full ${
+                      isOnline ? 'bg-blue-400' : 'bg-orange-400 animate-pulse'
+                    }`}></div>
+                    <span className="text-white/90 text-xs font-medium">
+                      {isOnline ? 'Online' : 'Offline Mode'}
+                    </span>
+                  </div>
+                  
                   <span className="text-white/70 text-xs">{currentTime}</span>
                 </div>
               </div>
@@ -529,7 +544,16 @@ export default function OperatorDashboard() {
             {activeView === 'dashboard' && (
               <>
              
-                <StatsGrid stats={stats} />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">System Overview</h2>
+                    <div className="flex items-center space-x-4">
+                      <NetworkStatus />
+                      <DataFreshnessIndicator data={stats} />
+                    </div>
+                  </div>
+                  <StatsGrid stats={stats} />
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                   
@@ -537,16 +561,27 @@ export default function OperatorDashboard() {
                     <Card className="modern-card border-l-4 border-l-emergency-red shadow-modern-lg">
                       <CardHeader className="border-b border-gray-200/50 bg-gradient-to-r from-emergency-red-light to-red-50 dark:from-gray-800 dark:to-gray-800 rounded-t-xl p-6">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
-                          <CardTitle className="text-gray-900 dark:text-gray-100 text-xl font-semibold">Active Incidents</CardTitle>
+                          <div className="flex flex-col space-y-2">
+                            <CardTitle className="text-gray-900 dark:text-gray-100 text-xl font-semibold">Active Incidents</CardTitle>
+                            <div className="flex items-center space-x-3">
+                              <DataFreshnessIndicator data={activeIncidents} />
+                              {!isOnline && (
+                                <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-full">
+                                  ⚠️ Offline Mode - Data may be outdated
+                                </span>
+                              )}
+                            </div>
+                          </div>
                           <Button 
                             className="act-gradient text-white font-semibold modern-button hover:scale-105 transform transition-all duration-200 w-full sm:w-auto"
                             size={isMobile ? "sm" : "default"}
                             onClick={createNewIncident}
+                            disabled={!isOnline}
                             data-testid="button-new-incident-main"
                           >
                             <Plus className="h-4 w-4 sm:mr-2" />
-                            <span className="hidden sm:inline">New Incident</span>
-                            <span className="sm:hidden">New</span>
+                            <span className="hidden sm:inline">{isOnline ? 'New Incident' : 'Offline'}</span>
+                            <span className="sm:hidden">{isOnline ? 'New' : 'Off'}</span>
                           </Button>
                         </div>
                       </CardHeader>
@@ -674,14 +709,26 @@ export default function OperatorDashboard() {
             {activeView === 'team' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-semibold text-gray-900">Team Management</h2>
+                  <div className="flex flex-col space-y-2">
+                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Team Management</h2>
+                    <div className="flex items-center space-x-3">
+                      <NetworkStatus />
+                      <DataFreshnessIndicator data={allTeamMembers} />
+                      {!isOnline && (
+                        <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-full">
+                          📱 Offline Mode - Team actions will be queued
+                        </span>
+                      )}
+                    </div>
+                  </div>
                   <Button 
                     className="bg-act-blue hover:bg-blue-700 text-white font-medium"
                     onClick={addNewTeamMember}
+                    disabled={!isOnline}
                     data-testid="button-add-team-member"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Team Member
+                    {isOnline ? 'Add Team Member' : 'Offline'}
                   </Button>
                 </div>
                 
@@ -776,7 +823,20 @@ export default function OperatorDashboard() {
 
             {activeView === 'reports' && (
               <div className="space-y-6">
-                <h2 className="text-2xl font-semibold text-gray-900">User Reports Management</h2>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col space-y-2">
+                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">User Reports Management</h2>
+                    <div className="flex items-center space-x-3">
+                      <NetworkStatus />
+                      <DataFreshnessIndicator data={stats} />
+                      {!isOnline && (
+                        <span className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-full">
+                          📱 Offline Mode - Report actions will be queued
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <UserReportsPanel />
                   <Card className="shadow-sm border border-gray-200">

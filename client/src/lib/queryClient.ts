@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { offlineStorage } from './offlineStorage';
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -104,18 +105,49 @@ export const enhancedQueryFn: typeof originalQueryFn = async (context) => {
     const result = await originalQueryFn(context);
     
     if (result && typeof result === 'object') {
-      const cacheKey = context.queryKey.join('/');
-      const cacheData = {
-        data: result,
-        timestamp: Date.now(),
-        queryKey: context.queryKey
-      };
+      const queryPath = context.queryKey.join('/');
       
+      // Cache data in IndexedDB based on endpoint type
       try {
+        if (queryPath.includes('/api/emergency-alerts')) {
+          await offlineStorage.cacheEmergencyAlerts(Array.isArray(result) ? result : [result]);
+        } else if (queryPath.includes('/api/team-members')) {
+          await offlineStorage.cacheTeamMembers(Array.isArray(result) ? result : [result]);
+        } else if (queryPath.includes('/api/system-status')) {
+          await offlineStorage.cacheSystemStatus(Array.isArray(result) ? result : [result]);
+        } else if (queryPath.includes('/api/incidents')) {
+          // Cache individual incidents
+          if (Array.isArray(result)) {
+            for (const incident of result) {
+              await offlineStorage.cacheIncident(incident);
+            }
+          } else {
+            await offlineStorage.cacheIncident(result);
+          }
+        } else if (queryPath.includes('/api/user-reports')) {
+          // Cache individual user reports
+          if (Array.isArray(result)) {
+            for (const report of result) {
+              await offlineStorage.cacheUserReport(report);
+            }
+          } else {
+            await offlineStorage.cacheUserReport(result);
+          }
+        }
+        
+        // Also keep localStorage fallback for smaller data
+        const cacheKey = context.queryKey.join('/');
+        const cacheData = {
+          data: result,
+          timestamp: Date.now(),
+          queryKey: context.queryKey
+        };
+        
         const dataStr = JSON.stringify(cacheData);
-        if (dataStr.length < 5 * 1024 * 1024) {
+        if (dataStr.length < 2 * 1024 * 1024) { // 2MB limit for localStorage
           localStorage.setItem(`cache-${cacheKey.replace(/\//g, '-')}`, dataStr);
         }
+        
       } catch (storageError) {
         console.warn('Failed to cache query result:', storageError);
       }
@@ -124,6 +156,42 @@ export const enhancedQueryFn: typeof originalQueryFn = async (context) => {
     return result;
   } catch (error) {
     if (navigator && !navigator.onLine) {
+      const queryPath = context.queryKey.join('/');
+      
+      // Try to get data from IndexedDB first (more comprehensive)
+      try {
+        let offlineData: any = null;
+        
+        if (queryPath.includes('/api/emergency-alerts')) {
+          offlineData = await offlineStorage.getOfflineEmergencyAlerts();
+        } else if (queryPath.includes('/api/team-members')) {
+          offlineData = await offlineStorage.getOfflineTeamMembers();
+        } else if (queryPath.includes('/api/system-status')) {
+          offlineData = await offlineStorage.getOfflineSystemStatus();
+        } else if (queryPath.includes('/api/incidents')) {
+          offlineData = await offlineStorage.getOfflineIncidents();
+        } else if (queryPath.includes('/api/user-reports')) {
+          offlineData = await offlineStorage.getOfflineUserReports();
+        }
+        
+        if (offlineData && offlineData.length > 0) {
+          const isStale = await offlineStorage.isDataStale(queryPath, 30 * 60 * 1000); // 30 minutes
+          
+          console.warn(`📱 Using ${isStale ? 'stale ' : ''}IndexedDB data for offline request:`, queryPath);
+          
+          return {
+            ...offlineData,
+            __offline: true,
+            __cached: true,
+            __stale: isStale,
+            __source: 'indexeddb'
+          };
+        }
+      } catch (indexedDBError) {
+        console.warn('Failed to get IndexedDB data, trying localStorage:', indexedDBError);
+      }
+      
+      // Fallback to localStorage
       const cacheKey = context.queryKey.join('/');
       const cachedDataStr = localStorage.getItem(`cache-${cacheKey.replace(/\//g, '-')}`);
       
@@ -132,17 +200,29 @@ export const enhancedQueryFn: typeof originalQueryFn = async (context) => {
           const cachedData = JSON.parse(cachedDataStr);
           const isStale = Date.now() - cachedData.timestamp > 30 * 60 * 1000;
           
-          console.warn(`Using ${isStale ? 'stale ' : ''}cached data for offline request:`, cacheKey);
+          console.warn(`📱 Using ${isStale ? 'stale ' : ''}localStorage data for offline request:`, cacheKey);
           
           return {
             ...cachedData.data,
             __offline: true,
             __cached: true,
-            __stale: isStale
+            __stale: isStale,
+            __source: 'localstorage'
           };
         } catch (parseError) {
           console.error('Failed to parse cached data:', parseError);
         }
+      }
+      
+      // Last resort: return empty array for list endpoints
+      if (queryPath.includes('/api/')) {
+        console.warn(`📱 No offline data available for ${queryPath}, returning empty array`);
+        return {
+          __offline: true,
+          __cached: false,
+          __empty: true,
+          __source: 'fallback'
+        };
       }
     }
     

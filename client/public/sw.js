@@ -217,36 +217,125 @@ async function handleAppShellRequest(request) {
 }
 
 function getOfflineFallbackData(pathname) {
+  const timestamp = Date.now();
+  
   if (pathname.includes('/api/emergency-alerts')) {
-    return {
-      offline: true,
-      message: 'Emergency alerts unavailable offline. Please check connection.',
-      data: JSON.parse(localStorage.getItem('last-emergency-alerts') || '[]')
-    };
+    return JSON.parse(localStorage.getItem('last-emergency-alerts') || '[]').map(alert => ({
+      ...alert,
+      __offline: true,
+      __cached: true,
+      __source: 'localStorage'
+    }));
   }
   
   if (pathname.includes('/api/team-members')) {
-    return {
-      offline: true,
-      message: 'Team data unavailable offline. Please check connection.',
-      data: JSON.parse(localStorage.getItem('last-team-members') || '[]')
-    };
+    const defaultTeam = [
+      {
+        id: 'offline-team-1',
+        name: 'Emergency Team (Offline)',
+        role: 'First Responder',
+        status: 'available',
+        contactNumber: 'N/A (Offline)',
+        specializations: ['Emergency Response'],
+        __offline: true,
+        __fallback: true
+      }
+    ];
+    const cachedTeam = JSON.parse(localStorage.getItem('last-team-members') || JSON.stringify(defaultTeam));
+    return cachedTeam.map(member => ({
+      ...member,
+      __offline: true,
+      __cached: true,
+      __source: 'localStorage'
+    }));
   }
   
   if (pathname.includes('/api/system-status')) {
-    return {
-      offline: true,
-      message: 'System status unavailable offline.',
-      data: {
+    const defaultStatus = [
+      {
+        id: 'offline-status-1',
+        component: 'Emergency Response System',
         status: 'offline',
-        lastUpdated: Date.now(),
-        services: []
+        level: 0,
+        notes: 'System running in offline mode',
+        lastUpdated: new Date(timestamp).toISOString(),
+        __offline: true,
+        __fallback: true
       }
+    ];
+    const cachedStatus = JSON.parse(localStorage.getItem('last-system-status') || JSON.stringify(defaultStatus));
+    return cachedStatus.map(status => ({
+      ...status,
+      __offline: true,
+      __cached: true,
+      __source: 'localStorage'
+    }));
+  }
+  
+  if (pathname.includes('/api/incidents')) {
+    const cachedIncidents = JSON.parse(localStorage.getItem('last-incidents') || '[]');
+    return cachedIncidents.map(incident => ({
+      ...incident,
+      __offline: true,
+      __cached: true,
+      __source: 'localStorage'
+    }));
+  }
+  
+  if (pathname.includes('/api/user-reports')) {
+    const cachedReports = JSON.parse(localStorage.getItem('last-user-reports') || '[]');
+    return cachedReports.map(report => ({
+      ...report,
+      __offline: true,
+      __cached: true,
+      __source: 'localStorage'
+    }));
+  }
+  
+  if (pathname.includes('/api/dashboard-stats')) {
+    return {
+      activeIncidents: 0,
+      teamOnDuty: '0/0',
+      pendingReports: 0,
+      resolvedReports: 0,
+      __offline: true,
+      __fallback: true,
+      __source: 'fallback'
     };
   }
   
+  if (pathname.includes('/api/vapid-public-key')) {
+    return {
+      publicKey: 'BDhdybofVzDW3l9W1fJhhNQFQiBjc2y7E1l0bAzPDG_TPw0Sw8wTMu_rkdja_pQtLUZJRHT_85m4yIKmJa-w77Y',
+      __offline: true,
+      __fallback: true
+    };
+  }
+  
+  // Generic API endpoint fallback
+  if (pathname.startsWith('/api/')) {
+    const isListEndpoint = !pathname.match(/\/[^\/]+\/[a-zA-Z0-9-]+$/); // Check if it's a list vs single item
+    
+    if (isListEndpoint) {
+      return {
+        __offline: true,
+        __empty: true,
+        __source: 'fallback',
+        message: 'This data is not available offline. Your actions will be queued and synchronized when connection is restored.'
+      };
+    } else {
+      return {
+        __offline: true,
+        __notFound: true,
+        __source: 'fallback',
+        message: 'This resource is not available offline.'
+      };
+    }
+  }
+  
   return {
-    offline: true,
+    __offline: true,
+    __error: true,
     message: 'This service is unavailable offline. Please check your connection.'
   };
 }
@@ -734,7 +823,7 @@ async function queueOfflineSubmission(request) {
   }
 }
 
-// Process queued offline submissions
+// Process queued offline submissions with enhanced error handling
 async function processOfflineSubmissions() {
   console.log('🔄 Processing queued offline submissions...');
   
@@ -744,56 +833,166 @@ async function processOfflineSubmissions() {
     
     if (requests.length === 0) {
       console.log('📭 No queued submissions found');
-      return;
+      return { processed: 0, failed: 0, remaining: 0 };
     }
     
-    console.log(`📬 Found ${requests.length} queued submissions`);
+    console.log(`📬 Found ${requests.length} queued submissions to process`);
+    
+    let processed = 0;
+    let failed = 0;
+    const maxRetries = 3;
+    const retryDelay = (attempt) => Math.min(1000 * Math.pow(2, attempt), 10000); // Exponential backoff, max 10s
     
     for (const request of requests) {
       try {
         const response = await cache.match(request);
-        if (!response) continue;
+        if (!response) {
+          console.warn('⚠️ No response found for cached request, skipping');
+          continue;
+        }
         
         const submission = await response.json();
         
-        // Try to submit
-        console.log('🚀 Attempting to submit queued item:', submission.id);
-        
-        const result = await fetch(submission.url, {
-          method: submission.method,
-          headers: submission.headers,
-          body: submission.body
-        });
-        
-        if (result.ok) {
-          console.log('✅ Successfully submitted queued item:', submission.id);
+        // Check if submission has exceeded max retries
+        if (submission.retries >= maxRetries) {
+          console.error(`❌ Submission ${submission.id} exceeded max retries (${maxRetries}), removing from queue`);
           await cache.delete(request);
-          
-          // Notify clients of successful submission
-          notifyClientsOfSubmissionSuccess(submission);
-        } else {
-          throw new Error(`HTTP ${result.status}: ${result.statusText}`);
+          failed++;
+          continue;
         }
         
-      } catch (error) {
-        console.error('❌ Failed to submit queued item:', error);
-        // Keep item in queue for retry
+        console.log(`🚀 Attempting to submit queued item: ${submission.id} (attempt ${submission.retries + 1}/${maxRetries})`);
+        
+        // Create request with timeout and abort controller
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          console.warn(`⏰ Request timeout for submission: ${submission.id}`);
+        }, 15000); // 15 second timeout
+        
+        try {
+          const result = await fetch(submission.url, {
+            method: submission.method,
+            headers: {
+              ...submission.headers,
+              'Content-Type': 'application/json'
+            },
+            body: submission.body,
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (result.ok) {
+            console.log(`✅ Successfully submitted queued item: ${submission.id}`);
+            await cache.delete(request);
+            processed++;
+            
+            // Notify clients of successful submission
+            await notifyClientsOfSubmissionSuccess(submission);
+            
+            // For emergency submissions, show additional confirmation
+            if (submission.isEmergency) {
+              try {
+                await self.registration.showNotification('✅ Emergency Report Sent', {
+                  body: 'Your emergency report has been successfully submitted to operators',
+                  icon: '/favicon.ico',
+                  tag: 'emergency-sent',
+                  requireInteraction: false,
+                  vibrate: [200, 100, 200],
+                  data: { type: 'success', submissionId: submission.id }
+                });
+              } catch (notifError) {
+                console.warn('⚠️ Could not show success notification:', notifError);
+              }
+            }
+            
+          } else {
+            // Handle HTTP errors
+            const errorText = await result.text().catch(() => 'Unknown error');
+            throw new Error(`HTTP ${result.status}: ${result.statusText} - ${errorText}`);
+          }
+          
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          
+          // Increment retry count and update submission
+          submission.retries = (submission.retries || 0) + 1;
+          submission.lastError = fetchError.message;
+          submission.lastAttempt = Date.now();
+          
+          console.error(`❌ Failed to submit queued item ${submission.id} (attempt ${submission.retries}/${maxRetries}):`, fetchError.message);
+          
+          if (submission.retries < maxRetries) {
+            // Update the cached submission with retry info
+            const updatedResponse = new Response(JSON.stringify(submission));
+            await cache.put(request, updatedResponse);
+            
+            // Wait before next retry
+            const delay = retryDelay(submission.retries - 1);
+            console.log(`⏳ Will retry submission ${submission.id} in ${delay}ms`);
+            
+          } else {
+            console.error(`💀 Submission ${submission.id} permanently failed after ${maxRetries} attempts`);
+            await cache.delete(request);
+            failed++;
+          }
+        }
+        
+      } catch (submissionError) {
+        console.error('❌ Error processing individual submission:', submissionError);
+        failed++;
+        
+        // Try to remove corrupted submission data
+        try {
+          await cache.delete(request);
+          console.log('🧹 Removed corrupted submission from queue');
+        } catch (deleteError) {
+          console.error('❌ Failed to remove corrupted submission:', deleteError);
+        }
       }
     }
     
-    // Check if any items remain and schedule another sync if needed
+    // Check remaining items and schedule retry if needed
     const remainingRequests = await cache.keys();
-    if (remainingRequests.length > 0) {
-      console.log(`⏰ ${remainingRequests.length} submissions still pending, will retry later`);
+    const remaining = remainingRequests.length;
+    
+    console.log(`📊 Offline sync completed: ${processed} processed, ${failed} failed, ${remaining} remaining`);
+    
+    if (remaining > 0) {
+      console.log(`⏰ Scheduling retry for ${remaining} pending submissions`);
       if (self.registration.sync) {
+        // Schedule retry with exponential backoff
         setTimeout(() => {
-          self.registration.sync.register('offline-submissions');
-        }, 30000); // Retry in 30 seconds
+          self.registration.sync.register('offline-submissions').catch(syncError => {
+            console.error('❌ Failed to register background sync:', syncError);
+          });
+        }, Math.min(30000, 5000 * Math.pow(1.5, failed))); // Adaptive retry delay
       }
     }
+    
+    return { processed, failed, remaining };
     
   } catch (error) {
-    console.error('❌ Error processing offline submissions:', error);
+    console.error('❌ Critical error processing offline submissions:', error);
+    
+    // Try to notify clients about the sync failure
+    try {
+      const clients = await self.clients.matchAll();
+      clients.forEach(client => {
+        if (client.postMessage) {
+          client.postMessage({
+            type: 'sync-error',
+            error: error.message,
+            timestamp: Date.now()
+          });
+        }
+      });
+    } catch (clientError) {
+      console.error('❌ Failed to notify clients of sync error:', clientError);
+    }
+    
+    return { processed: 0, failed: 0, remaining: 0, error: error.message };
   }
 }
 
