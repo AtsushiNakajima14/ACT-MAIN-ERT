@@ -333,33 +333,36 @@ class OfflineStorage {
       };
       await this.put(STORES.OFFLINE_QUEUE, queueItem);
       
-      // If this is an emergency report, also store it as a pending report for operators
+      // If this is an emergency report or help request, store it as an active report for operators
       if (submission.isEmergency && submission.body) {
         try {
           const reportData = JSON.parse(submission.body);
-          const queuedReport = {
-            id: `queued-${queueItem.id}`,
-            type: reportData.type || 'emergency_report',
-            title: reportData.title || 'Queued Emergency Report',
+          const isHelpRequest = submission.url.includes('help-requests');
+          
+          const activeReport = {
+            id: `offline-${queueItem.id}`,
+            type: isHelpRequest ? 'help_request' : (reportData.type || 'emergency_report'),
+            title: reportData.title || (isHelpRequest ? 'Help Request (Offline)' : 'Emergency Report (Offline)'),
             message: reportData.message || reportData.description,
             location: reportData.location,
-            priority: reportData.priority || 'critical',
-            status: 'queued',
+            priority: reportData.priority || (isHelpRequest ? 'normal' : 'critical'),
+            status: 'active', // Active status, not queued
             createdAt: new Date(queueItem.timestamp).toISOString(),
+            assignedTo: null,
             metadata: {
               ...reportData.metadata,
-              queuedOffline: true,
-              originalSubmissionId: queueItem.id
+              submittedOffline: true,
+              originalSubmissionId: queueItem.id,
+              syncStatus: 'pending'
             },
-            __offline: true,
-            __queued: true
+            __offline: true
           };
           
-          // Store as a user report that operators can see
-          await this.cacheUserReport(queuedReport);
-          console.log('📱 Cached queued emergency report for operators:', queuedReport.id);
+          // Store as an active user report that operators can work with immediately
+          await this.cacheUserReport(activeReport);
+          console.log(`📱 Created ${isHelpRequest ? 'help request' : 'active incident'} for operators:`, activeReport.id);
         } catch (parseError) {
-          console.warn('⚠️ Failed to parse emergency report data for operator display:', parseError);
+          console.warn('⚠️ Failed to parse report data for operator display:', parseError);
         }
       }
       

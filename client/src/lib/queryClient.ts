@@ -171,7 +171,20 @@ export const enhancedQueryFn: typeof originalQueryFn = async (context) => {
         } else if (queryPath.includes('/api/incidents')) {
           offlineData = await offlineStorage.getOfflineIncidents();
         } else if (queryPath.includes('/api/user-reports')) {
-          offlineData = await offlineStorage.getOfflineUserReports();
+          const allReports = await offlineStorage.getOfflineUserReports();
+          
+          // Filter based on query parameters
+          if (queryPath.includes('pending=true')) {
+            // Show active offline reports as pending for operators
+            offlineData = allReports.filter(report => 
+              report.status === 'pending' || report.status === 'active' || report.__offline
+            );
+          } else if (queryPath.includes('help-requests')) {
+            // Show only help requests
+            offlineData = allReports.filter(report => report.type === 'help_request');
+          } else {
+            offlineData = allReports;
+          }
         }
         
         if (offlineData && offlineData.length > 0) {

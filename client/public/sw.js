@@ -799,7 +799,7 @@ async function queueOfflineSubmission(request) {
       body: body,
       timestamp: Date.now(),
       retries: 0,
-      isEmergency: url.pathname.includes('user-reports') || url.pathname.includes('emergency')
+      isEmergency: url.pathname.includes('user-reports') || url.pathname.includes('emergency') || url.pathname.includes('help-requests')
     };
     
     // Store in cache for persistence
