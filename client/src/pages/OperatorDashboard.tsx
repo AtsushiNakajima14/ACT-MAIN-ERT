@@ -359,63 +359,66 @@ export default function OperatorDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800">
       
       <header className="bg-gradient-to-r from-red-600 to-red-700 dark:from-red-700 dark:to-red-800 shadow-2xl sticky top-0 z-50 border-b-4 border-red-800">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex justify-between items-center h-16">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4">
+          <div className="flex justify-between items-center h-14 sm:h-16">
           
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl overflow-hidden bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center flex-shrink-0">
                 <img 
                   src="/ACTIEF-ERT.jpg" 
                   alt="ACT Emergency Response Team Logo" 
                   className="w-full h-full object-cover rounded-lg"
                 />
               </div>
-              <div>
-                <h1 className="text-white font-bold text-lg tracking-tight" data-testid="header-title">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-white font-bold text-sm sm:text-lg tracking-tight truncate" data-testid="header-title">
                   ACT MAIN - ERT
                 </h1>
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 sm:space-x-3 flex-wrap">
+                  <div className="flex items-center space-x-1 sm:space-x-2">
                     <div className={`w-2 h-2 rounded-full ${
                       isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'
                     }`}></div>
-                    <span className="text-white/90 text-xs font-medium">
+                    <span className="text-white/90 text-xs font-medium hidden sm:inline">
                       {isConnected ? 'Live' : reconnectAttempts >= maxReconnectAttempts ? 'Connection Failed' : `Reconnecting (${reconnectAttempts}/${maxReconnectAttempts})`}
+                    </span>
+                    <span className="text-white/90 text-xs font-medium sm:hidden">
+                      {isConnected ? 'Live' : 'Offline'}
                     </span>
                   </div>
                   
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1 sm:space-x-2">
                     <div className={`w-2 h-2 rounded-full ${
                       isOnline ? 'bg-blue-400' : 'bg-orange-400 animate-pulse'
                     }`}></div>
-                    <span className="text-white/90 text-xs font-medium">
+                    <span className="text-white/90 text-xs font-medium hidden sm:inline">
                       {isOnline ? 'Online' : 'Offline Mode'}
                     </span>
                   </div>
                   
-                  <span className="text-white/70 text-xs">{currentTime}</span>
+                  <span className="text-white/70 text-xs hidden md:inline">{currentTime}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
               
               {(stats?.activeIncidents || 0) > 0 && (
-                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 flex items-center space-x-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-300 animate-pulse" />
-                  <span className="text-white text-sm font-semibold">{stats?.activeIncidents}</span>
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-2 sm:px-3 py-1 flex items-center space-x-1 sm:space-x-2">
+                  <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-300 animate-pulse" />
+                  <span className="text-white text-xs sm:text-sm font-semibold">{stats?.activeIncidents}</span>
                 </div>
               )}
               
-              <div className="hidden md:flex items-center space-x-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
+              <div className="hidden lg:flex items-center space-x-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
                 <User className="h-4 w-4 text-white/80" />
-                <span className="text-white text-sm font-medium">{user?.username}</span>
+                <span className="text-white text-sm font-medium truncate max-w-[100px]">{user?.username}</span>
               </div>
               
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="text-white hover:bg-white/10 border border-white/20 rounded-xl backdrop-blur-sm"
+                className="text-white hover:bg-white/10 border border-white/20 rounded-lg sm:rounded-xl backdrop-blur-sm min-h-[40px] px-2 sm:px-3"
                 onClick={handleLogout}
                 disabled={logout.isPending}
                 data-testid="button-logout"
@@ -428,8 +431,8 @@ export default function OperatorDashboard() {
       </header>
 
       {isMobile && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 z-50 shadow-2xl">
-          <div className="grid grid-cols-5 h-16">
+        <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 z-50 shadow-2xl safe-area-inset-bottom">
+          <div className="grid grid-cols-5 h-16 pb-safe">
             {[
               { id: 'dashboard', icon: Home, label: 'Home', badge: null },
               { id: 'incidents', icon: AlertTriangle, label: 'Incidents', badge: activeIncidents.length },
@@ -440,7 +443,7 @@ export default function OperatorDashboard() {
               <button
                 key={item.id}
                 onClick={() => setActiveView(item.id)}
-                className={`flex flex-col items-center justify-center space-y-1 relative transition-all duration-200 ${
+                className={`flex flex-col items-center justify-center space-y-1 relative transition-all duration-200 min-h-[44px] px-1 ${
                   activeView === item.id 
                     ? 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20' 
                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
@@ -450,12 +453,12 @@ export default function OperatorDashboard() {
                 <div className="relative">
                   <item.icon className="h-5 w-5" />
                   {item.badge !== null && item.badge > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold min-w-[20px]">
                       {item.badge > 99 ? '99+' : item.badge}
                     </span>
                   )}
                 </div>
-                <span className="text-xs font-medium truncate">{item.label}</span>
+                <span className="text-xs font-medium truncate max-w-full">{item.label}</span>
                 {activeView === item.id && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-600 dark:bg-red-400"></div>
                 )}
@@ -538,16 +541,16 @@ export default function OperatorDashboard() {
         </aside>
       )}
 
-      <main className={`${isMobile ? 'pb-16' : 'ml-72'} min-h-screen pt-4`}>
-        <div className={`p-4 ${isMobile ? 'max-w-full' : 'max-w-6xl mx-auto'}`}>
+      <main className={`${isMobile ? 'pb-20' : 'ml-72'} min-h-screen pt-2 sm:pt-4`}>
+        <div className={`p-3 sm:p-4 ${isMobile ? 'max-w-full' : 'max-w-6xl mx-auto'}`}>
 
             {activeView === 'dashboard' && (
               <>
              
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">System Overview</h2>
-                    <div className="flex items-center space-x-4">
+                <div className="space-y-2 sm:space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">System Overview</h2>
+                    <div className="flex items-center space-x-3 sm:space-x-4">
                       <NetworkStatus />
                       <DataFreshnessIndicator data={stats} />
                     </div>

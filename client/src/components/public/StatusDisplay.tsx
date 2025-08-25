@@ -46,12 +46,12 @@ export default function StatusDisplay() {
           <span className="font-semibold">Current Status</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-6">
-        <div className="space-y-5" data-testid="status-items">
-          <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-800 dark:to-gray-800 rounded-xl border border-green-200/50 space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-700 dark:text-gray-300 flex items-center font-semibold">
-                <div className="p-2 bg-status-green/10 rounded-lg mr-3">
+      <CardContent className="p-4 sm:p-6">
+        <div className="space-y-4 sm:space-y-5" data-testid="status-items">
+          <div className="p-3 sm:p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-800 dark:to-gray-800 rounded-xl border border-green-200/50 space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
+              <span className="text-gray-700 dark:text-gray-300 flex items-center font-semibold text-sm sm:text-base">
+                <div className="p-2 bg-status-green/10 rounded-lg mr-3 flex-shrink-0">
                   <Users className="h-4 w-4 text-status-green" />
                 </div>
                 ERT Team Members
@@ -68,23 +68,23 @@ export default function StatusDisplay() {
               {teamMembers.length > 0 ? (
                 teamMembers.map((member) => (
                   <div key={member.id} className="flex items-center justify-between p-3 bg-white/70 dark:bg-gray-700/70 rounded-lg border border-green-100/50">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-2 h-2 rounded-full ${
+                    <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                         member.status === 'on_duty' ? 'bg-status-green animate-pulse' :
                         member.status === 'available' ? 'bg-blue-500' :
                         member.status === 'off_duty' ? 'bg-gray-400' :
                         'bg-red-500'
                       }`}></div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100" data-testid={`member-name-${member.id}`}>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate" data-testid={`member-name-${member.id}`}>
                           {member.name}
                         </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-300" data-testid={`member-role-${member.id}`}>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 truncate" data-testid={`member-role-${member.id}`}>
                           {member.role}
                         </p>
                       </div>
                     </div>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0 ${
                       member.status === 'on_duty' ? 'bg-status-green/20 text-status-green' :
                       member.status === 'available' ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400' :
                       member.status === 'off_duty' ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' :
@@ -104,13 +104,13 @@ export default function StatusDisplay() {
           
 
           {systemStatus.map((component) => (
-            <div key={component.id} className="flex items-center justify-between p-4 bg-gray-50/50 dark:bg-gray-800/50 rounded-xl hover:bg-gray-100/50 dark:hover:bg-gray-700/50 transition-all duration-200">
-              <span className="text-gray-700 dark:text-gray-300 capitalize font-medium">
+            <div key={component.id} className="flex items-center justify-between p-3 sm:p-4 bg-gray-50/50 dark:bg-gray-800/50 rounded-xl hover:bg-gray-100/50 dark:hover:bg-gray-700/50 transition-all duration-200">
+              <span className="text-gray-700 dark:text-gray-300 capitalize font-medium text-sm sm:text-base min-w-0 flex-1 truncate">
                 {component.component.replace('_', ' ')}
               </span>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
                 {getStatusIcon(component.status)}
-                <span className={`text-sm font-semibold ${
+                <span className={`text-xs sm:text-sm font-semibold ${
                   component.status === 'operational' ? 'text-status-green' : 'text-act-yellow'
                 }`} data-testid={`status-${component.component}`}>
                   {getStatusText(component)}
@@ -119,9 +119,9 @@ export default function StatusDisplay() {
             </div>
           ))}
 
-          <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200/50 bg-gray-50/30 dark:bg-gray-800/30 rounded-lg p-3">
-            <Clock className="h-4 w-4" />
-            <span className="font-medium">Last updated: {new Date().toLocaleTimeString()}</span>
+          <div className="flex items-center justify-center space-x-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200/50 bg-gray-50/30 dark:bg-gray-800/30 rounded-lg p-3">
+            <Clock className="h-4 w-4 flex-shrink-0" />
+            <span className="font-medium text-center">Last updated: {new Date().toLocaleTimeString()}</span>
           </div>
         </div>
       </CardContent>
