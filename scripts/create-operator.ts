@@ -1,12 +1,14 @@
 import { db } from "../server/db";
 import { users } from "@shared/schema";
 import { hashPassword } from "../server/auth";
+import { CONFIG } from "../server/config";
 import { eq } from "drizzle-orm";
 
 async function createDefaultOperator() {
   try {
-    const operatorUsername = process.env.OPERATOR_USERNAME || 'operator';
-    const operatorPassword = process.env.OPERATOR_PASSWORD || 'ert2025!';
+    // Use centralized config instead of hardcoded values
+    const operatorUsername = process.env.OPERATOR_USERNAME || CONFIG.auth.adminUsername;
+    const operatorPassword = process.env.OPERATOR_PASSWORD || CONFIG.auth.adminPassword;
 
     const existingOperator = await db
       .select()
