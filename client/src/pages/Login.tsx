@@ -199,7 +199,6 @@ export default function Login() {
               </Button>
             </form>
 
-            {/* Back to User Panel Button */}
             <div className="pt-4">
               <Link href="/">
                 <Button
@@ -209,12 +208,11 @@ export default function Login() {
                   className="w-full h-11 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 dark:hover:border-slate-500 transition-all duration-200 font-medium"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to User Panel
+                  User Panel For Non-Personnel
                 </Button>
               </Link>
             </div>
 
-            {/* Security Notice */}
             <div className="mt-6 sm:mt-8 p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
               <div className="flex items-start space-x-2 sm:space-x-3">
                 <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
